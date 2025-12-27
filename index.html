@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Bill Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        /* CSS Section */
+        :root { --primary-color: #2c3e50; --accent-color: #27ae60; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        
+        .main-wrapper { max-width: 850px; margin: auto; }
+        
+        #invoice { 
+            background: #fff; 
+            padding: 50px; 
+            border-radius: 4px; 
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            min-height: 1000px;
+            position: relative;
+        }
+
+        /* Editable Areas */
+        [contenteditable="true"]:hover { background: #f9f9f9; outline: 1px dashed #ccc; cursor: text; }
+        
+        .header { display: flex; justify-content: space-between; border-bottom: 3px solid var(--primary-color); padding-bottom: 20px; }
+        
+        .logo-area { width: 150px; height: 100px; border: 1px dashed #ddd; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; }
+        .logo-area img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+        .shop-details h1 { margin: 0; font-size: 28px; color: var(--primary-color); text-transform: uppercase; }
+        .shop-details p { margin: 5px 0; font-size: 14px; color: #666; }
+
+        .bill-info { text-align: right; }
+        .bill-info h2 { margin: 0; color: var(--primary-color); letter-spacing: 2px; }
+
+        .bill-table { width: 100%; border-collapse: collapse; margin: 30px 0; }
+        .bill-table th { background: var(--primary-color); color: #fff; padding: 12px; text-align: left; }
+        .bill-table td { border-bottom: 1px solid #eee; padding: 12px; }
+        
+        .bill-table input { border: none; width: 100%; font-size: 15px; outline: none; background: transparent; }
+        .bill-table input[type="number"] { width: 60px; }
+
+        .totals-area { display: flex; justify-content: flex-end; margin-top: 20px; }
+        .total-box { width: 250px; background: #f8f9fa; padding: 15px; border-radius: 5px; }
+        .total-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; }
+        .grand-total { border-top: 2px solid var(--primary-color); padding-top: 10px; font-size: 18px; color: var(--primary-color); }
+
+        .footer { margin-top: 80px; display: flex; justify-content: space-between; }
+        .signature-box { border-top: 1px solid #333; width: 200px; text-align: center; padding-top: 5px; font-weight: bold; }
+
+        /* Controls Section */
+        .controls { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
+        .btn { padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.3s; }
+        .btn-add { background: #3498db; color: white; }
+        .btn-pdf { background: var(--accent-color); color: white; flex-grow: 1; max-width: 300px; }
+        .btn-del { background: #ff4757; color: white; padding: 5px 10px; font-size: 12px; }
+        .btn:hover { opacity: 0.8; transform: translateY(-2px); }
+
+        /* Utility */
+        .no-print { display: block; }
+        @media print { .no-print { display: none !important; } }
+    </style>
+</head>
+<body>
+
+<div class="main-wrapper">
+    <div id="invoice">
+        <div class="header">
+            <div class="left-head">
+                <div class="logo-area" onclick="document.getElementById('fileInput').click()">
+                    <span id="logo-text">Upload Logo</span>
+                    <img id="logo-img" style="display:none">
+                    <input type="file" id="fileInput" style="display:none" accept="image/*" onchange="loadLogo(event)">
+                </div>
+                <div class="shop-details" style="margin-top: 15px;">
+                    <h1 contenteditable="true">YOUR SHOP NAME</h1>
+                    <p contenteditable="true">123 Street Address, City Name, State</p>
+                    <p contenteditable="true">GSTIN: 09XXXXXXXXXXXXZ | Contact: +91 0000000000</p>
+                </div>
+            </div>
+            
+            <div class="bill-info">
+                <h2>INVOICE</h2>
+                <p><strong>Bill No:</strong> <span contenteditable="true">#101</span></p>
+                <p><strong>Date:</strong> <span id="bill-date"></span></p>
+                <div style="margin-top: 10px; text-align: right;">
+                    <strong>Bill To:</strong><br>
+                    <p contenteditable="true" style="color:#333; font-style: italic;">Customer Name & Details</p>
+                </div>
+            </div>
+        </div>
+
+        <table class="bill-table">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th style="width: 100px;">Price (₹)</th>
+                    <th style="width: 80px;">Qty</th>
+                    <th style="width: 120px;">Total (₹)</th>
+                    <th class="no-print" style="width: 50px;">Action</th>
+                </tr>
+            </thead>
+            <tbody id="bill-items">
+                <tr>
+                    <td><input type="text" placeholder="Enter Item Name" value="Sample Item"></td>
+                    <td><input type="number" class="price" value="100" oninput="calculate()"></td>
+                    <td><input type="number" class="qty" value="1" oninput="calculate()"></td>
+                    <td class="row-total">100.00</td>
+                    <td class="no-print"><button class="btn-del" onclick="removeRow(this)">X</button></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="totals-area">
+            <div class="total-box">
+                <div class="total-row">
+                    <span>Sub Total:</span>
+                    <span>₹<span id="sub-total">100.00</span></span>
+                </div>
+                <div class="total-row grand-total">
+                    <span>Grand Total:</span>
+                    <span>₹<span id="grand-total">100.00</span></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div style="font-size: 12px; color: #777;">
+                <p><strong>Terms & Conditions:</strong></p>
+                <p contenteditable="true">1. Goods once sold will not be taken back.<br>2. Subject to local jurisdiction.</p>
+            </div>
+            <div class="signature-box">
+                Authorized Signatory
+            </div>
+        </div>
+    </div>
+
+    <div class="controls no-print">
+        <button class="btn btn-add" onclick="addRow()">+ Add New Item</button>
+        <button class="btn btn-pdf" onclick="generatePDF()">Download Professional PDF</button>
+    </div>
+</div>
+
+<script>
+    // 1. Current Date Set Karna
+    document.getElementById('bill-date').innerText = new Date().toLocaleDateString('en-IN');
+
+    // 2. Logo Upload Function
+    function loadLogo(event) {
+        const reader = new FileReader();
+        reader.onload = function(){
+            const output = document.getElementById('logo-img');
+            output.src = reader.result;
+            output.style.display = 'block';
+            document.getElementById('logo-text').style.display = 'none';
+        };
+        reader.readAsDataURL(event.target.files[0]);
+    }
+
+    // 3. New Row Add Karna
+    function addRow() {
+        const tbody = document.getElementById('bill-items');
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><input type="text" placeholder="Enter Item Name"></td>
+            <td><input type="number" class="price" value="0" oninput="calculate()"></td>
+            <td><input type="number" class="qty" value="1" oninput="calculate()"></td>
+            <td class="row-total">0.00</td>
+            <td class="no-print"><button class="btn-del" onclick="removeRow(this)">X</button></td>
+        `;
+        tbody.appendChild(row);
+        calculate();
+    }
+
+    // 4. Row Remove Karna
+    function removeRow(btn) {
+        btn.closest('tr').remove();
+        calculate();
+    }
+
+    // 5. Calculation Logic
+    function calculate() {
+        let rows = document.querySelectorAll('#bill-items tr');
+        let grandTotal = 0;
+
+        rows.forEach(row => {
+            let price = parseFloat(row.querySelector('.price').value) || 0;
+            let qty = parseFloat(row.querySelector('.qty').value) || 0;
+            let total = price * qty;
+            row.querySelector('.row-total').innerText = total.toFixed(2);
+            grandTotal += total;
+        });
+
+        document.getElementById('sub-total').innerText = grandTotal.toFixed(2);
+        document.getElementById('grand-total').innerText = grandTotal.toFixed(2);
+    }
+
+    // 6. Professional PDF Generate Karna
+    function generatePDF() {
+        const element = document.getElementById('invoice');
+        const opt = {
+            margin:       [0.2, 0.2],
+            filename:     'Invoice_Report.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 3, useCORS: true },
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+
+        // UI Buttons hide ho jayenge automatic @media print se
+        html2pdf().set(opt).from(element).save();
+    }
+</script>
+
+</body>
+</html>
